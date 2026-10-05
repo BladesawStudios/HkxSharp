@@ -105,6 +105,8 @@ public sealed class HkClass
     public int ForceAlign { get; init; }
     public uint Signature { get; init; }
     public List<HkMember> Members { get; } = [];
+    public HkTagType? TagType { get; init; }
+    internal HkLayout? Explicit { get; set; }
 
     readonly HkLayout?[] _layouts = new HkLayout?[4];
     HkMember[]? _flat;
@@ -137,6 +139,7 @@ public sealed class HkClass
 
     public HkLayout Layout(HkAbi a)
     {
+        if (Explicit is not null) return Explicit;
         int slot = (a.PointerSize == 8 ? 2 : 0) + (a.ReusePadding ? 1 : 0);
         if (_layouts[slot] is { } cached) return cached;
         int off = 0, align = 1;

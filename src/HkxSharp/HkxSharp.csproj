@@ -8,7 +8,7 @@
     <AssemblyName>HkxSharp</AssemblyName>
     <Version>1.0.0</Version>
     <Authors>Aiden A</Authors>
-    <Description>Reader for Havok 2014 binary packfiles (hkx) in both 32-bit big-endian and 64-bit little-endian layouts.</Description>
+    <Description>Reader for Havok 2014 binary packfiles (hkx) in both 32-bit big-endian and 64-bit little-endian layouts, and for Havok tagfiles (TAG0) such as the physics in Tears of the Kingdom.</Description>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
   </PropertyGroup>
 
