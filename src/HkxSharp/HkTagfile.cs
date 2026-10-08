@@ -11,8 +11,22 @@ public sealed class HkTagfile
     public List<HkTagItem> Items { get; } = [];
     public List<(HkTagType? Type, int[] Offsets)> Patches { get; } = [];
     public List<HkObject> Objects { get; } = [];
-    public HkObject? Root { get; internal set; }
+    public HkObject? Root { get; set; }
     public List<HkIssue> Issues { get; } = [];
+
+    /// <summary>The TYPE chunk as read, header included.</summary>
+    public byte[] TypeChunk { get; private set; } = [];
+
+    /// <summary>The TYPE chunk's children in file order, with the bytes of those that are not rebuilt from the types (TPTR, TSHA, TPAD).</summary>
+    public List<(string Tag, byte[] Body)> TypeParts { get; } = [];
+
+    /// <summary>The string tables of the type names and field names, in the order the file stores them.</summary>
+    public List<string> TypeStrings { get; private set; } = [];
+    public List<string> FieldStrings { get; private set; } = [];
+
+    /// <summary>The types with a body (TBDY) and with a hash (THSH), each in file order.</summary>
+    public List<HkTagType> BodyOrder { get; } = [];
+    public List<HkTagType> HashOrder { get; } = [];
 
     public HkTagType? FindType(string name) => Types.FirstOrDefault(t => t?.Name == name);
 
@@ -24,7 +38,9 @@ public sealed class HkTagfile
         int size = (int)(BinaryPrimitives.ReadUInt32BigEndian(d) & 0x3FFFFFFF);
         if (size > d.Length) throw new InvalidDataException("TAG0 runs past the end of the data.");
         var chunks = new Dictionary<string, (int Start, int Length)>();
-        void Walk(ReadOnlySpan<byte> s, int start, int end)
+        byte[] typeChunk = [];
+        var typeParts = new List<(string, byte[])>();
+        void Walk(ReadOnlySpan<byte> s, int start, int end, string parent)
         {
             while (start + 8 <= end)
             {
@@ -33,20 +49,24 @@ public sealed class HkTagfile
                 if (len < 8 || start + len > end) throw new InvalidDataException($"Bad tagfile chunk at 0x{start:X}.");
                 var tag = Encoding.ASCII.GetString(s.Slice(start + 4, 4));
                 chunks.TryAdd(tag, (start + 8, len - 8));
-                if ((w & 0x40000000) == 0) Walk(s, start + 8, start + len);
+                if (tag == "TYPE" && typeChunk.Length == 0) typeChunk = s.Slice(start, len).ToArray();
+                if (parent == "TYPE") typeParts.Add((tag, s.Slice(start + 8, len - 8).ToArray()));
+                if ((w & 0x40000000) == 0) Walk(s, start + 8, start + len, tag);
                 start += len;
             }
         }
-        Walk(d, 8, size);
+        Walk(d, 8, size, "TAG0");
         ReadOnlySpan<byte> Chunk(ReadOnlySpan<byte> s, string tag) => chunks.TryGetValue(tag, out var c) ? s.Slice(c.Start, c.Length) : default;
 
         var f = new HkTagfile
         {
             SdkVersion = Encoding.ASCII.GetString(Chunk(d, "SDKV")).TrimEnd('\0'),
-            Data = Chunk(d, "DATA").ToArray()
+            Data = Chunk(d, "DATA").ToArray(),
+            TypeChunk = typeChunk
         };
-        var typeStrings = Strings(Chunk(d, "TSTR").IsEmpty ? Chunk(d, "TST1") : Chunk(d, "TSTR"));
-        var fieldStrings = Strings(Chunk(d, "FSTR").IsEmpty ? Chunk(d, "FST1") : Chunk(d, "FSTR"));
+        f.TypeParts.AddRange(typeParts);
+        var typeStrings = f.TypeStrings = Strings(Chunk(d, "TSTR").IsEmpty ? Chunk(d, "TST1") : Chunk(d, "TSTR"));
+        var fieldStrings = f.FieldStrings = Strings(Chunk(d, "FSTR").IsEmpty ? Chunk(d, "FST1") : Chunk(d, "FSTR"));
         f.ReadNames(Chunk(d, "TNAM").IsEmpty ? Chunk(d, "TNA1") : Chunk(d, "TNAM"), typeStrings);
         f.ReadBodies(Chunk(d, "TBDY").IsEmpty ? Chunk(d, "TBOD") : Chunk(d, "TBDY"), fieldStrings);
         f.ReadHashes(Chunk(d, "THSH"));
@@ -97,6 +117,7 @@ public sealed class HkTagfile
             int index = (int)r.Read();
             if (index == 0) break;
             var t = TypeAt(index)!;
+            BodyOrder.Add(t);
             t.Parent = TypeAt(r.Read());
             int p = (int)r.Read();
             t.Presence = p;
@@ -140,7 +161,9 @@ public sealed class HkTagfile
         {
             var t = TypeAt(r.Read());
             uint h = r.U32();
-            if (t is not null) t.Hash = h;
+            if (t is null) continue;
+            t.Hash = h;
+            HashOrder.Add(t);
         }
     }
 

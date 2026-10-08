@@ -5,8 +5,8 @@ public sealed class HkObject
     public required string ClassName { get; init; }
     public required uint Signature { get; init; }
     public required int Offset { get; init; }
-    public HkClass? Class { get; internal set; }
-    public HkStruct? Fields { get; internal set; }
+    public HkClass? Class { get; set; }
+    public HkStruct? Fields { get; set; }
     public HkOpaque? Opaque { get; internal set; }
 
     public object? this[string name] => Fields?[name];

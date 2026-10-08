@@ -17,6 +17,19 @@ public sealed class HkxFile
         return f;
     }
 
+    /// <summary>Writes the file back out in the layout it was read with.</summary>
+    public byte[] ToBinary() => Tagfiles.Count > 0
+        ? HkTagfileWriter.Write(Tagfiles[0])
+        : HkPackfileWriter.Write(Packfiles, new HkTarget(Main.Abi, Main.LittleEndian));
+
+    /// <summary>Writes a BotW packfile for <paramref name="target"/>, first changing its contents to that platform's form (in place).</summary>
+    public byte[] ToBinary(HkTarget target)
+    {
+        if (Tagfiles.Count > 0) throw new NotSupportedException("Tagfiles have a single layout; use ToBinary().");
+        HkConvert.ToPlatform(Packfiles, target);
+        return HkPackfileWriter.Write(Packfiles, target);
+    }
+
     public IEnumerable<HkObject> Objects => Packfiles.SelectMany(p => p.Objects).Concat(Tagfiles.SelectMany(t => t.Objects));
 
     public IEnumerable<HkObject> OfClass(string name) => Objects.Where(o => o.Class?.IsA(name) ?? o.ClassName == name);

@@ -40,7 +40,7 @@ public sealed class HkPackfile
     public int Length { get; private init; }
     public int FileOffset { get; private set; }
     public List<HkObject> Objects { get; } = [];
-    public HkObject? Root { get; private set; }
+    public HkObject? Root { get; set; }
     public List<HkIssue> Issues { get; } = [];
     public HkAbi Abi => new(PointerSize, ReusePadding);
 
