@@ -25,6 +25,8 @@ public sealed class HkTagType
     public int AlignAndFlags { get; internal set; }
     public int AbstractValue { get; internal set; }
     public List<HkTagField> Fields { get; } = [];
+    /// <summary>Flags Havok 2022 keeps above bit 16 of a type body's field count (0 in older files).</summary>
+    public int FieldFlags { get; internal set; }
     public List<(HkTagType Type, int Value)> Interfaces { get; } = [];
     public int Attribute { get; internal set; }
     public uint Hash { get; internal set; }

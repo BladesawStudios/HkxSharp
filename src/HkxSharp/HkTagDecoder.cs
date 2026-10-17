@@ -267,7 +267,7 @@ sealed class HkTagDecoder
                     8 => BinaryPrimitives.ReadDoubleLittleEndian(_d.AsSpan(at)),
                     _ => throw new InvalidDataException($"{_ctx}: {size} byte float")
                 };
-            case HkTagKind.String: return String(at);
+            case HkTagKind.String: return String(at, PtrWidth(c));
             case HkTagKind.Pointer: return Pointer(c, at);
             case HkTagKind.Record:
                 if (FloatCount(c) is > 0 and var n) return Floats(at, n);
@@ -288,20 +288,25 @@ sealed class HkTagDecoder
         return r;
     }
 
-    int ItemIndex(int at)
+    // Item references are 8 bytes in older tagfiles (TotK: native 64-bit layout, arrays carry their size at +8). Havok 2022
+    // tagfiles (Z-A) store pointers, strings and arrays as 4-byte item indices, and an array's count is its item's count.
+    static int PtrWidth(HkTagType c) => c.ResolvedSize is > 0 and < 8 ? 4 : 8;
+
+    int ItemIndex(int at, int width = 8)
     {
-        Claim(at, 8);
+        Claim(at, width);
         _usedPatches.Add(at);
-        long v = BinaryPrimitives.ReadInt64LittleEndian(_d.AsSpan(at));
-        if (v != 0 && !_patched.Contains(at)) Issue("raw-ptr", at, $"item index {v} without patch");
+        long v = width == 4 ? BinaryPrimitives.ReadInt32LittleEndian(_d.AsSpan(at)) : BinaryPrimitives.ReadInt64LittleEndian(_d.AsSpan(at));
+        // Havok 2022 tagfiles have no pointer patch table: their 4-byte item indices are used as they are
+        if (v != 0 && width == 8 && !_patched.Contains(at)) Issue("raw-ptr", at, $"item index {v} without patch");
         if (v < 0 || v >= _f.Items.Count) throw new InvalidDataException($"{_ctx}+0x{at - _ctxBase:X}: item index {v} out of range");
         _usedItems.Add((int)v);
         return (int)v;
     }
 
-    string? String(int at)
+    string? String(int at, int width)
     {
-        int item = ItemIndex(at);
+        int item = ItemIndex(at, width);
         if (item == 0) return null;
         var it = _f.Items[item];
         Claim(it.Offset, it.Count);
@@ -324,7 +329,7 @@ sealed class HkTagDecoder
             Issue("ptr-data", at, $"relative pointer to 0x{target:X} of unknown type");
             return new HkDataPtr(0, target);
         }
-        int item = ItemIndex(at);
+        int item = ItemIndex(at, PtrWidth(c));
         if (item == 0) return null;
         if (_byItem.TryGetValue(item, out var obj))
         {
@@ -349,7 +354,8 @@ sealed class HkTagDecoder
     {
         var elem = c.ResolvedSubType;
         if (c.IsTuple) return Elements(elem, at, c.TupleCount);
-        if (Field(c, "offset") is { } off)
+        // a relative array needs room for its offset and count; Havok 2022 tagfiles store hkRelArray(View) as a 4-byte item index
+        if (Field(c, "offset") is { } off && c.ResolvedSize >= 8)
         {
             long delta = Int(off.Type, at + off.Offset);
             var sz = Field(c, "size") ?? throw new InvalidDataException($"{_ctx}: relative array {c} without size");
@@ -361,9 +367,10 @@ sealed class HkTagDecoder
             Relative(target, n, at);
             return Elements(elem, target, n);
         }
-        int item = ItemIndex(at);
+        int width = PtrWidth(c);
+        int item = ItemIndex(at, width);
         Claim(at, c.ResolvedSize);
-        int stored = BinaryPrimitives.ReadInt32LittleEndian(_d.AsSpan(at + 8));
+        int stored = width == 8 ? BinaryPrimitives.ReadInt32LittleEndian(_d.AsSpan(at + 8)) : 0;
         if (item == 0)
         {
             if (stored != 0) Issue("array-count", at, $"size {stored} without data item");

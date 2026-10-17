@@ -132,7 +132,10 @@ public sealed class HkTagfile
             if ((p & 0x10) != 0) t.AbstractValue = (int)r.Read();
             if ((p & 0x20) != 0)
             {
-                int n = (int)r.Read();
+                // Havok 2022 (Z-A) keeps flags above bit 16 of the count, e.g. 0x20000 on hkReferencedObject
+                long packed = r.Read();
+                int n = (int)(packed & 0xFFFF);
+                t.FieldFlags = (int)(packed >> 16);
                 for (int k = 0; k < n; k++)
                 {
                     var name = strings[(int)r.Read()];

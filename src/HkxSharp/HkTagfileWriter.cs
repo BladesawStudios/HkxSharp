@@ -48,6 +48,9 @@ public sealed class HkTagfileWriter
     byte[] Run()
     {
         if (_f.Root is null) throw new InvalidDataException("The tagfile has no root object.");
+        // Havok 2022 tagfiles (e.g. Z-A's .trcol) store pointers, strings and arrays as 4-byte item indices; this writer lays out the older 8-byte form
+        if (_f.Types.Any(t => t is { Kind: HkTagKind.Pointer or HkTagKind.String } && t.ResolvedSize is > 0 and < 8))
+            throw new NotSupportedException($"Writing Havok {_f.SdkVersion} tagfiles (4-byte item references) is not supported yet.");
         ObjectItem(_f.Root);
         while (_queue.Count > 0) Process(_queue.Dequeue());
         foreach (var o in _f.Objects.Where(o => !_objects.ContainsKey(o)))
@@ -380,7 +383,8 @@ public sealed class HkTagfileWriter
         var n = new HkTagType
         {
             Index = _f.Types.Count, Name = t.Name, Presence = t.Presence, Format = t.Format, Version = t.Version, Size = t.Size,
-            AlignAndFlags = t.AlignAndFlags, AbstractValue = t.AbstractValue, Attribute = t.Attribute, Hash = t.Hash
+            AlignAndFlags = t.AlignAndFlags, AbstractValue = t.AbstractValue, Attribute = t.Attribute, Hash = t.Hash,
+            FieldFlags = t.FieldFlags
         };
         _imported[t] = n;
         _added++;
@@ -476,7 +480,7 @@ public sealed class HkTagfileWriter
             if ((p & 0x10) != 0) Packed(o, t.AbstractValue);
             if ((p & 0x20) != 0)
             {
-                Packed(o, t.Fields.Count);
+                Packed(o, t.Fields.Count | ((long)t.FieldFlags << 16));
                 foreach (var f in t.Fields)
                 {
                     Packed(o, Intern(strings, f.Name));
