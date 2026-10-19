@@ -264,7 +264,7 @@ sealed class HkTagDecoder
                 {
                     2 => (float)BinaryPrimitives.ReadHalfLittleEndian(_d.AsSpan(at)),
                     4 => F32(at),
-                    8 => BinaryPrimitives.ReadDoubleLittleEndian(_d.AsSpan(at)),
+                    8 => (object)BinaryPrimitives.ReadDoubleLittleEndian(_d.AsSpan(at)),
                     _ => throw new InvalidDataException($"{_ctx}: {size} byte float")
                 };
             case HkTagKind.String: return String(at, PtrWidth(c));

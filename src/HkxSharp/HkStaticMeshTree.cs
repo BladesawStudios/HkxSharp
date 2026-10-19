@@ -9,6 +9,8 @@ public sealed class HkMeshTriangle
     public required byte[] Indices { get; init; }
     public bool Quad { get; init; }
     public bool Custom { get; init; }
+    public uint Key { get; init; }
+    public int Interior { get; init; }
 }
 
 public static class HkStaticMeshTree
