@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <LibRoot Condition="'$(LibRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..</LibRoot>
+    <HkxLibRoot Condition="'$(HkxLibRoot)' == ''">$(MSBuildThisFileDirectory)..\..\lib</HkxLibRoot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,8 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\HkxSharp\HkxSharp.csproj" />
-    <ProjectReference Include="$(LibRoot)\SarcSharp\src\SarcSharp\SarcSharp.csproj" />
-    <ProjectReference Include="$(LibRoot)\ZsDicSharp\src\ZsDicSharp\ZsDicSharp.csproj" />
+    <ProjectReference Include="$(HkxLibRoot)\SarcSharp\src\SarcSharp\SarcSharp.csproj" />
+    <ProjectReference Include="$(HkxLibRoot)\ZsDicSharp\src\ZsDicSharp\ZsDicSharp.csproj" />
   </ItemGroup>
 
   <ItemGroup>
