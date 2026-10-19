@@ -480,7 +480,7 @@ public sealed class HkTagfileWriter
             if ((p & 0x10) != 0) Packed(o, t.AbstractValue);
             if ((p & 0x20) != 0)
             {
-                Packed(o, t.Fields.Count | ((long)t.FieldFlags << 16));
+                Packed(o, (uint)t.Fields.Count | ((long)t.FieldFlags << 16));
                 foreach (var f in t.Fields)
                 {
                     Packed(o, Intern(strings, f.Name));
