@@ -102,6 +102,10 @@ public class CorpusTests
                         HkMember m = s.Members[i];
                         if (m.Type.Kind == HkKind.F32 && s.Values[i] is not float)
                             checks.Fail("floats", $"{name}: {s.Class.Name}.{m.Name} is {s.Values[i]?.GetType().Name}");
+                        if (m.Type.Elem is { IsPrimitive: true } && s.Values[i] is object?[])
+                            checks.Fail("typed arrays", $"{name}: {s.Class.Name}.{m.Name} of {m.Type.Elem.Kind} is object[]");
+                        if (m.Type.Elem is { Kind: HkKind.Struct, ClassName: { } cn } && (cn.StartsWith("hkRefPtr<") || cn.StartsWith("T*<")))
+                            checks.Fail("typed arrays", $"{name}: {s.Class.Name}.{m.Name} of {cn} is not a pointer");
                         if (HkEnums.EnumType(s, m.Name) is not { } e || s.Values[i] is not { } raw || raw is Array) continue;
                         enumTypes.TryAdd(e, 0);
                         long value = Convert.ToInt64(raw);

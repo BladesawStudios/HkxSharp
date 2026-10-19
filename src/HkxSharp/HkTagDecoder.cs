@@ -191,6 +191,19 @@ sealed class HkTagDecoder
                 var et = elem is null ? HkType.Prim(HkKind.U8) : TypeOf(elem);
                 return Field(c, "offset") is not null ? HkType.RelArrayOf(et) : HkType.ArrayOf(et);
             default:
+                if (Bodiless(c) is { } known)
+                    return known.Kind switch
+                    {
+                        HkTagKind.Bool => HkType.Prim(HkKind.Bool),
+                        HkTagKind.Float => HkType.Prim(known.Size == 2 ? HkKind.Half : HkKind.F32),
+                        _ => HkType.Prim((known.Size, known.Signed) switch
+                        {
+                            (1, false) => HkKind.U8, (1, true) => HkKind.S8, (2, false) => HkKind.U16, (2, true) => HkKind.S16,
+                            (4, false) => HkKind.U32, (4, true) => HkKind.S32, (_, false) => HkKind.U64, _ => HkKind.S64
+                        })
+                    };
+                if (c.Kind == HkTagKind.Void && size == 0 && c.Name is "hkRefPtr" or "T*" && c.Templates is [{ Type: { } target }])
+                    return HkType.Pointer(target.FullName);
                 if (c.Kind == HkTagKind.Void && size == 0 && c.Name != "void")
                 {
                     var empty = HkType.StructOf(c.FullName);
@@ -381,14 +394,35 @@ sealed class HkTagDecoder
         return Elements(elem, it.Offset, it.Count);
     }
 
+    // A file leaves out the body of a type nothing in it needs - an empty array's element - so
+    // Havok's own primitive typedefs are known by name.
+    static (HkTagKind Kind, int Size, bool Signed)? Bodiless(HkTagType c) =>
+        c.Kind != HkTagKind.Void || c.ResolvedSize != 0 ? null : c.Name switch
+        {
+            "hkInt8" or "signed char" => (HkTagKind.Int, 1, true),
+            "hkUint8" or "unsigned char" or "char" => (HkTagKind.Int, 1, false),
+            "hkInt16" or "short" => (HkTagKind.Int, 2, true),
+            "hkUint16" or "unsigned short" => (HkTagKind.Int, 2, false),
+            "hkInt32" or "int" => (HkTagKind.Int, 4, true),
+            "hkUint32" or "unsigned int" => (HkTagKind.Int, 4, false),
+            "hkInt64" or "long long" => (HkTagKind.Int, 8, true),
+            "hkUint64" or "unsigned long long" or "hkUlong" => (HkTagKind.Int, 8, false),
+            "hkReal" or "float" or "hkFloat32" => (HkTagKind.Float, 4, false),
+            "hkHalf16" => (HkTagKind.Float, 2, false),
+            "hkBool" or "bool" => (HkTagKind.Bool, 1, false),
+            _ => null
+        };
+
     object Elements(HkTagType? e, int at, int n)
     {
         var c = e is null ? null : Canonical(e);
         int size = c?.ResolvedSize ?? 0;
         bool signed = c?.Signed ?? false;
         int fc = c is null ? 0 : FloatCount(c);
+        var kind = c?.Kind;
+        if (n == 0 && c is not null && Bodiless(c) is { } known) (kind, size, signed) = known;
         if (n == 0)
-            return c?.Kind switch
+            return kind switch
             {
                 HkTagKind.Bool => Array.Empty<bool>(),
                 HkTagKind.Int => (size, signed) switch
